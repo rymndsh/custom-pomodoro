@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fokus Kuy! — Pomodoro Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --break-ratio: 0.28;
+  --yellow:  #FFE566;
+  --yellow-d: #B89A00;
+  --red:     #FF5C5C;
+  --red-d:   #B52B2B;
+  --teal:    #3DD6C8;
+  --teal-d:  #1A877D;
+  --ink:     #1E1E1E;
+  --white:   #FFFFFF;
+  --bg:      #FBF7EE;
+  --border:  3px solid #1E1E1E;
+  --shadow:  6px 6px 0 #1E1E1E;
+  --shadow-sm: 4px 4px 0 #1E1E1E;
+  --r-xl: 28px;
+  --r-lg: 20px;
+  --r-md: 14px;
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* DEKORASI */
+.blob {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.15;
+  z-index: 0;
+}
+.blob-1 { width: 340px; height: 340px; background: var(--yellow); top: -100px; left: -100px; }
+.blob-2 { width: 300px; height: 300px; background: var(--teal);   bottom: -80px; right: -80px; }
+.blob-3 { width: 200px; height: 200px; background: var(--red);    top: 40%; right: -60px; }
+
+/* TOAST */
+#toasts {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 360px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--r-lg);
+  border: var(--border);
+  box-shadow: var(--shadow);
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.5;
+  color: var(--ink);
+  animation: tIn 0.38s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+.toast.out { animation: tOut 0.28s ease both; }
+.toast-work  { background: var(--red);    color: #fff; }
+.toast-break { background: var(--teal); }
+.toast-done  { background: var(--yellow); }
+.toast-info  { background: var(--ink); color: #fff; }
+.toast-em { font-size: 1.5rem; flex-shrink: 0; line-height: 1.2; }
+
+@keyframes tIn  { from { opacity:0; transform:translateY(-20px) scale(0.88); } to { opacity:1; transform:none; } }
+@keyframes tOut { from { opacity:1; } to { opacity:0; transform:translateY(-8px) scale(0.92); } }
+
+/* WRAPPER */
+.wrapper {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+h1.title {
+  font-family: 'Fredoka One', cursive;
+  font-size: 2.8rem;
+  color: var(--ink);
+  text-shadow: 4px 4px 0 rgba(0,0,0,0.1);
+  margin-bottom: 4px;
+  letter-spacing: 1px;
+}
+.sub {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #999;
+  margin-bottom: 22px;
+}
+
+/* CARD */
+.card {
+  background: #fff;
+  border: var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow);
+  padding: 34px 30px 26px;
+  width: 100%;
+  transition: background 0.4s;
+}
+.card.work  { background: #FFF0F0; }
+.card.break { background: #EEF9F8; }
+
+/* BADGE */
+.badge-row { display: flex; justify-content: center; margin-bottom: 18px; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 22px;
+  border-radius: 999px;
+  border: var(--border);
+  box-shadow: var(--shadow-sm);
+  font-family: 'Fredoka One', cursive;
+  font-size: 1rem;
+  background: var(--yellow);
+  color: var(--ink);
+  transition: background 0.3s, color 0.3s;
+}
+.card.work  .badge { background: var(--red);  color: #fff; }
+.card.break .badge { background: var(--teal); color: var(--ink); }
+
+/* TIMER */
+.timer-wrap { text-align: center; }
+.timer {
+  display: block;
+  font-family: 'Fredoka One', cursive;
+  font-size: 6rem;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: 3px;
+}
+.timer-lbl {
+  font-size: 0.73rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #bbb;
+  margin: 5px 0 16px;
+}
+
+/* PROGRESS */
+.prog-track {
+  height: 13px;
+  background: #EBEBEB;
+  border-radius: 999px;
+  border: var(--border);
+  overflow: hidden;
+  margin-bottom: 18px;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.card.break .prog-track { opacity: 1; }
+.prog-fill {
+  height: 100%;
+  background: var(--teal);
+  border-radius: 999px;
+  width: 100%;
+  transition: width 1s linear;
+}
+
+/* MOTIVASI */
+.motivasi {
+  background: var(--yellow);
+  border: var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 14px 18px;
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.55;
+  margin-bottom: 22px;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  transition: opacity 0.25s ease, background 0.4s;
+}
+.card.work  .motivasi { background: #FFD8D8; }
+.card.break .motivasi { background: #C2F0EB; }
+
+/* STATS */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.stat {
+  background: #F5F2EA;
+  border: 2px solid #DEDBD0;
+  border-radius: var(--r-md);
+  padding: 10px 6px;
+  text-align: center;
+}
+.stat-v {
+  display: block;
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.25rem;
+  color: var(--ink);
+  line-height: 1;
+}
+.stat-l {
+  font-size: 0.67rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #999;
+  margin-top: 3px;
+  display: block;
+}
+
+/* BUTTONS */
+.btns { display: flex; flex-direction: column; gap: 11px; }
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px 24px;
+  border: var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  font-family: 'Fredoka One', cursive;
+  font-size: 1.05rem;
+  cursor: pointer;
+  width: 100%;
+  background: #fff;
+  color: var(--ink);
+  transition: transform 0.1s, box-shadow 0.1s, filter 0.15s;
+  letter-spacing: 0.3px;
+}
+.btn:hover  { filter: brightness(0.95); }
+.btn:active { transform: translate(4px,4px); box-shadow: 2px 2px 0 #1E1E1E !important; }
+.btn-start  { background: var(--red);    color: #fff; }
+.btn-finish { background: var(--yellow); color: var(--ink); }
+.btn-skip   { background: var(--teal);   color: var(--ink); }
+.btn-reset  { background: #fff; color: #bbb; border-color: #ddd; box-shadow: 3px 3px 0 #ddd; font-size: 0.85rem; padding: 12px; }
+.btn-reset:active { box-shadow: 1px 1px 0 #ddd !important; }
+
+/* ANIM */
+@keyframes pop    { 0%{transform:scale(0.85)} 60%{transform:scale(1.08)} 100%{transform:scale(1)} }
+@keyframes wiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-5deg)} 75%{transform:rotate(5deg)} }
+.pop    { animation: pop    0.36s cubic-bezier(0.34,1.56,0.64,1); }
+.wiggle { animation: wiggle 0.4s ease; }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+<div id="toasts"></div>
+
+<div class="wrapper">
+  <h1 class="title">🍅 Fokus Kuy!</h1>
+  <p class="sub">Custom Pomodoro Timer</p>
+
+  <div class="card" id="card">
+    <div class="badge-row">
+      <div class="badge" id="badge">
+        <span id="bicon">😴</span>
+        <span id="btext">Siap Mulai</span>
+      </div>
+    </div>
+
+    <div class="timer-wrap">
+      <span class="timer" id="timer">00:00</span>
+      <div class="timer-lbl" id="tlbl">Belum mulai · tekan mulai kerja</div>
+    </div>
+
+    <div class="prog-track" id="prog-track">
+      <div class="prog-fill" id="prog-fill"></div>
+    </div>
+
+    <div class="motivasi" id="motivasi">💤 Pilih "Mulai Kerja" kalau kamu sudah siap fokus!</div>
+
+    <div class="stats">
+      <div class="stat"><span class="stat-v" id="sv-sess">0</span><span class="stat-l">Sesi Selesai</span></div>
+      <div class="stat"><span class="stat-v" id="sv-work">0:00</span><span class="stat-l">Total Kerja</span></div>
+      <div class="stat"><span class="stat-v" id="sv-break">0:00</span><span class="stat-l">Istirahat</span></div>
+    </div>
+
+    <div class="btns" id="btns"></div>
+  </div>
+</div>
+
+<script>
+const BREAK_RATIO = 0.28;
+
+const M_IDLE  = [["😴","Santai dulu, tekan Mulai Kerja kalau siap!"],["🌅","Hari baru, semangat baru. Yuk mulai!"],["🎯","Satu langkah kecil sekarang, manfaatnya besar nanti."],["🚀","Versi terbaik dirimu sedang menunggu — ayo mulai!"]];
+const M_WORK  = [["🔥","Kamu lagi in the zone! Pertahankan fokusnya!"],["💻","Deep work mode ON. Singkirkan semua distraksi!"],["🧠","Otak kamu lagi bekerja keras. Keren banget!"],["⚡","Setiap menit yang kamu investasikan adalah hadiah masa depan."],["🎯","Fokus satu hal. Selesaikan. Baru lanjut. Bisa!"],["💪","Progress kecil tetap progress. Jangan berhenti!"],["✨","Pikiran yang fokus menghasilkan karya luar biasa!"]];
+const M_BREAK = [["☕","Waktunya istirahat! Kamu sudah kerja keras banget tadi!"],["🧘","Tarik napas dalam-dalam. Kamu layak dapat jeda ini!"],["🌿","Istirahat bukan kemalasan — ini investasi sesi berikutnya!"],["🍵","Minum air putih, regangkan badan, nikmati momennya!"],["🎵","Putar lagu favorit dan charge ulang energimu!"]];
+
+const T_WORK  = [["🔥","Yesss! Let's gooo! Fokus penuh sekarang!","toast-work"],["💪","Semangaaaaat! Kamu pasti bisa! Mulai!","toast-work"],["🚀","Mode fokus aktif! Singkirkan distraksi!","toast-work"],["⚡","Ayo tunjukkan kemampuanmu! Gas pol!","toast-work"],["🎯","Satu sesi, satu tujuan. Fokus total!","toast-work"]];
+const T_DONE  = [["🔔","Waktu istirahat habis! Siap untuk sesi berikutnya?","toast-done"],["⏰","Ding ding! Istirahat selesai. Yuk kerja lagi!","toast-done"],["🌟","Sudah segar? Ayo lanjutkan sesi berikutnya!","toast-done"]];
+
+let state='idle', workS=0, brkTotal=0, brkLeft=0, tickId=null, motId=null, sessions=0, totalWork=0;
+
+function fmt(s){ return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function fmtS(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function rnd(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+function toast(em,tx,cls,dur){
+  dur=dur||4500;
+  const c=document.getElementById('toasts');
+  const d=document.createElement('div');
+  d.className='toast '+(cls||'toast-info');
+  d.innerHTML='<span class="toast-em">'+em+'</span><span>'+tx+'</span>';
+  c.appendChild(d);
+  setTimeout(()=>{ d.classList.add('out'); setTimeout(()=>d.remove(),300); },dur);
+}
+
+function setMotivasi(arr){
+  clearInterval(motId);
+  const el=document.getElementById('motivasi');
+  const show=()=>{ const[e,t]=rnd(arr); el.style.opacity='0'; setTimeout(()=>{ el.textContent=e+' '+t; el.style.opacity='1'; },220); };
+  el.style.transition='opacity 0.22s, background 0.4s';
+  show();
+  motId=setInterval(show,13000);
+}
+
+function animT(type){
+  const el=document.getElementById('timer');
+  el.classList.remove('pop','wiggle');
+  void el.offsetWidth;
+  el.classList.add(type);
+}
+
+function render(){
+  const card=document.getElementById('card');
+  card.className='card '+state;
+  document.getElementById('bicon').textContent = state==='work'?'🔥':state==='break'?'☕':'😴';
+  document.getElementById('btext').textContent = state==='work'?'Mode Kerja':state==='break'?'Mode Istirahat':'Siap Mulai';
+  document.getElementById('timer').textContent = state==='work'?fmt(workS):state==='break'?fmt(brkLeft):'00:00';
+  document.getElementById('tlbl').textContent  = state==='work'?'Stopwatch kerja berjalan ▲':state==='break'?'Hitung mundur istirahat ▼':'Belum mulai · tekan mulai kerja';
+
+  if(state==='break'){
+    const pct=brkTotal>0?(brkLeft/brkTotal)*100:0;
+    document.getElementById('prog-fill').style.width=pct+'%';
+  }
+
+  document.getElementById('sv-sess').textContent  = sessions;
+  document.getElementById('sv-work').textContent  = fmtS(totalWork);
+  document.getElementById('sv-break').textContent = fmtS(Math.round(totalWork*BREAK_RATIO));
+
+  const btns=document.getElementById('btns');
+  if(state==='idle'){
+    btns.innerHTML='<button class="btn btn-start" onclick="startWork()">▶ Mulai Kerja</button>'+(sessions>0?'<button class="btn btn-reset" onclick="resetAll()">↺ Reset Semua</button>':'');
+  } else if(state==='work'){
+    btns.innerHTML='<button class="btn btn-finish" onclick="finishWork()">✔ Selesai Kerja — Ambil Istirahat!</button><button class="btn btn-reset" onclick="resetAll()">↺ Reset Semua</button>';
+  } else {
+    btns.innerHTML='<button class="btn btn-skip" onclick="finishBreak()">⏭ Selesai Istirahat (skip)</button><button class="btn btn-reset" onclick="resetAll()">↺ Reset Semua</button>';
+  }
+}
+
+function startWork(){
+  if(state!=='idle') return;
+  state='work'; workS=0;
+  const[e,t,c]=rnd(T_WORK);
+  toast(e,t,c,4500);
+  setMotivasi(M_WORK);
+  tickId=setInterval(()=>{ workS++; document.getElementById('timer').textContent=fmt(workS); },1000);
+  animT('pop'); render();
+}
+
+function finishWork(){
+  if(state!=='work') return;
+  clearInterval(tickId);
+  totalWork+=workS; sessions++;
+  brkTotal=Math.round(workS*BREAK_RATIO); brkLeft=brkTotal;
+  if(brkTotal<=0){ state='idle'; setMotivasi(M_IDLE); render(); return; }
+  state='break';
+  document.getElementById('prog-fill').style.transition='none';
+  document.getElementById('prog-fill').style.width='100%';
+  toast('☕','Kerja '+fmt(workS)+' → istirahat '+fmt(brkTotal)+'. Nikmati jaedanya!','toast-break',5000);
+  setMotivasi(M_BREAK);
+  tickId=setInterval(()=>{
+    brkLeft--;
+    document.getElementById('timer').textContent=fmt(brkLeft);
+    const pct=brkTotal>0?(brkLeft/brkTotal)*100:0;
+    document.getElementById('prog-fill').style.transition='width 1s linear';
+    document.getElementById('prog-fill').style.width=pct+'%';
+    if(brkLeft<=0){ clearInterval(tickId); brkOver(); }
+  },1000);
+  animT('pop'); render();
+}
+
+function finishBreak(){
+  if(state!=='break') return;
+  clearInterval(tickId); brkOver();
+}
+// NOTE: finishBreak is re-patched below to use updated brkOver with sound
+
+function brkOver(){
+  state='idle';
+  const[e,t,c]=rnd(T_DONE);
+  toast(e,t,c,5500);
+  setMotivasi(M_IDLE);
+  animT('wiggle'); render();
+}
+
+function resetAll(){
+  clearInterval(tickId); clearInterval(motId);
+  state='idle'; workS=0; brkTotal=0; brkLeft=0; sessions=0; totalWork=0;
+  setMotivasi(M_IDLE); render();
+}
+
+// =============================================
+// AUDIO ENGINE — Web Audio API, zero file deps
+// =============================================
+let audioCtx = null;
+
+function getCtx(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// Generic tone builder
+function playTone(freq, type, startTime, dur, vol, ctx){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(vol, startTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+  osc.start(startTime);
+  osc.stop(startTime + dur + 0.05);
+}
+
+// 🔴 MULAI KERJA — energetik, ascending fanfare
+function soundStartWork(){
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  // Quick ascending chord punch
+  [[330,0],[415,0.07],[523,0.14],[659,0.21],[784,0.30]].forEach(([f,dt])=>{
+    playTone(f,'square',t+dt,0.25,0.18,ctx);
+    playTone(f*2,'sine',t+dt,0.20,0.06,ctx);
+  });
+  // Bass thump
+  playTone(80,'sine',t,0.35,0.4,ctx);
+  playTone(80,'sine',t+0.32,0.25,0.25,ctx);
+}
+
+// ☕ MULAI ISTIRAHAT — warm descending, relaxing
+function soundStartBreak(){
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  [[659,0],[523,0.15],[415,0.30],[330,0.45]].forEach(([f,dt])=>{
+    playTone(f,'sine',t+dt,0.4,0.14,ctx);
+    playTone(f*1.5,'sine',t+dt,0.3,0.04,ctx);
+  });
+  // Soft pad
+  playTone(220,'sine',t,0.9,0.08,ctx);
+}
+
+// 🔔 BREAK SELESAI — alert bell sequence, 3 dings
+function soundBreakDone(){
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  [0, 0.28, 0.56].forEach((dt,i)=>{
+    const freq = 880 * (i===2 ? 1.5 : 1);
+    playTone(freq,'sine',t+dt,0.5,0.22,ctx);
+    playTone(freq*2,'sine',t+dt,0.3,0.06,ctx);
+    playTone(freq*3,'sine',t+dt+0.02,0.2,0.03,ctx);
+  });
+  // Final long ring
+  playTone(1320,'sine',t+0.65,1.2,0.15,ctx);
+}
+
+// =============================================
+// PATCH: inject sound calls into actions
+// =============================================
+const _startWork  = startWork;
+const _finishWork = finishWork;
+const _brkOver    = brkOver;
+
+startWork = function(){
+  soundStartWork();
+  _startWork();
+};
+
+finishWork = function(){
+  // capture state before original mutates it
+  const wasWork = state==='work';
+  _finishWork();
+  if(wasWork && state==='break') soundStartBreak();
+};
+
+brkOver = function(){
+  soundBreakDone();
+  _brkOver();
+};
+
+// Re-patch finishBreak to use new brkOver
+finishBreak = function(){
+  if(state!=='break') return;
+  clearInterval(tickId); brkOver();
+};
+
+setMotivasi(M_IDLE);
+render();
+</script>
+</body>
+</html>
